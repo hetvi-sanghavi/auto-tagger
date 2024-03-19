@@ -1,0 +1,53 @@
+name: 'Terraform Create'
+
+on:
+  workflow_dispatch:
+    inputs:
+      lambda_function_name:
+          description: 'Pass lambda_function_name'
+          type: string
+          default: 'TagInstanceFunction'
+          required: true
+      cloudtrail_name:
+        description: 'Pass cloudtrail_name'
+        type: string
+        required: true
+        default: 'Autotagging'
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+      - name: Terraform Init
+        run: terraform init
+
+        #Terraform Workspace
+      - name: Terraform Workspace
+        run: terraform workspace new ${{ inputs.lambda_function_name }} || terraform workspace select ${{ inputs.lambda_function_name }}
+
+      # Generates an execution plan for Terraform
+      - name: Terraform Plan
+        run: terraform plan -var lambda_function_name=${{ inputs.lambda_function_name }}  -var cloudtrail_name=${{ inputs.cloudtrail_name }} -input=false -out tfplan
+
+      # Apply generated Terraform plan
+      - name: Terraform Apply
+        run: terraform apply "tfplan"
